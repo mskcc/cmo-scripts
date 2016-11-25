@@ -7,8 +7,8 @@ def main():
     proj_ep = 'https://gdc-api.nci.nih.gov/legacy/projects/'
     file_ep = 'https://gdc-api.nci.nih.gov/legacy/files/'
 
-    parser = argparse.ArgumentParser( description='Download open access TCGA MAFs from GDC Legacy Archive' )
-    parser.add_argument('-d', '--download', action='store_true', default=False, help='Specify this if you want to download the files too' )
+    parser = argparse.ArgumentParser( description='List open access TCGA MAFs from GDC Legacy Archive' )
+    parser.add_argument('-d', '--download', action='store_true', default=False, help='download the MAFs too' )
     args = vars( parser.parse_args() )
 
     # Fetch all projects IDs, and limit them to anything starting with "TCGA-"
@@ -56,8 +56,6 @@ def main():
             print( '\t'.join([ proj_id, maf['file_id'], maf['file_name'] ]))
             if args['download']:
                download_file( maf['file_id'], '/'.join([ 'mafs', proj_id, maf['file_name'] ]))
-
-        exit( 0 )
 
 # Given a GDC UUID and a local file path, this function downloads and saves a file
 def download_file( file_id, filepath ):
