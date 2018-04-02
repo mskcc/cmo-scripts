@@ -84,9 +84,11 @@ foreach my $rg_line ( @rg_lines ) {
     # BI appends index seq to FCID.Lane after a dot, while WashU appends it after a hyphen
     # Baylor (BCM) has their own nutty format in the PU tag, that uses an ID# for the index sequence
     # BCM may also prefix letters A or B to the flowcell ID to indicate the side it was loaded
+    # MSKCC's deidentified clinical IMPACT BAMs use a deidentified alphanumeric code in the PU tag
     if(( $rg{PU} and $rg{PU} =~ m/^([A-Z0-9]{7}XX)\.(\d+)[.-]?([ACGT]*)$/i ) or
        ( $rg{PU} and $rg{PU} =~ m/^([A-Z0-9]{7}XX\d+)\.(\d+)[.-]?([ACGT-]*)$/i ) or
-       ( $rg{PU} and $rg{PU} =~ m/^\w+_[AB]?([A-Z0-9]{7}XX)[_-](\d+)[_-]?(ID\d+)?$/i )) {
+       ( $rg{PU} and $rg{PU} =~ m/^\w+_[AB]?([A-Z0-9]{7}XX)[_-](\d+)[_-]?(ID\d+)?$/i ) or
+       ( $rg{PU} and $rg{PU} =~ m/^(\w\w\d{10}\w\w)$/i )) {
         ( $flowcell_id, $lane, $index ) = map{$_ ? $_ : ""} ( $1, $2, $3 );
     }
     # UNC hides FCID.Lane in a convoluted format within the ID tag, while the PU tag just says "barcode"
