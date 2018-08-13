@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
-# GOAL: Extract reads from a BAM into FASTQs, and generate a SampleSheet with readgroup info in a
-# format familiar to the IGO/GCL/BIC at MSKCC
+# GOAL: Extract reads from a BAM into FASTQs, and generate SampleSheet and sample_mapping files,
+# formats familiar to the Center for Molecular Oncology (CMO) at MSKCC
 #
 # AUTHOR: Cyriac Kandoth (ckandoth@gmail.com)
 
@@ -44,7 +44,7 @@ mkdir $output_dir unless( -d $output_dir );
 
 # If FASTQs were already created, warn the user. We'll skip Picard but create the @RG info files
 my ( $skip_picard, %fq_info ) = ( 0, ());
-my @fq_files = glob( "$output_dir/*.fastq.gz" );
+my @fq_files = glob( "$output_dir/rg*/*.fastq.gz" );
 if( @fq_files ) {
     warn "WARNING: Will not replace existing FASTQs in $output_dir, but might rename them\n";
     $skip_picard = 1;
@@ -62,14 +62,12 @@ my ( $paired_end ) = map {chomp; ( $_ & 0x1 )} `$samtools_bin view $bam_file | h
 # Parse through the different read-group formats that folks use, and write out a proper SampleSheet
 my $sheet_fh = IO::File->new( "$output_dir/SampleSheet.csv", ">" );
 $sheet_fh->print( "#FCID,Lane,SampleID,SampleRef,Index,Description,Control,Recipe,Operator,SampleProject,Platform,Library,InsertSize,Date,Center\n" );
-# Also create a sample-fastq mapping file, in the format that the MSK BIC pipeline expects
-my $mapping_fh = IO::File->new( "$output_dir/sample_mapping.txt", ">" );
-my $prev_mapping_line = ""; # We'll use this to deduplicate contents of the mapping file
 foreach my $rg_line ( @rg_lines ) {
 
     # Parse out the easy things first
     my %rg = map{split( /:/, $_, 2 )} split( /\t/, $rg_line );
     my ( $platform, $library, $insert_size, $date, $center, $description ) = map{$rg{$_} ? $rg{$_} : ""} qw( PL LB PI DT CN DS );
+    $sample_id = $rg{SM} unless( $sample_id );
 
     # Do some cleanup and standardization of terms used
     $platform = lc( $platform );
@@ -111,15 +109,11 @@ foreach my $rg_line ( @rg_lines ) {
     $flowcell_id = uc( $flowcell_id ); # There's at least 1 instance where this was lowercase
     $fq_info{$fq_name} = "$flowcell_id,$lane,$sample_id,,$index,$description,,,,,$platform,$library,$insert_size,$date,$center";
 
-    # Write all this info into the SampleSheet, and to the sample-fastq mapping file
+    # Write all this info into the SampleSheet
     $sheet_fh->print( $fq_info{$fq_name} . "\n" );
-    my $mapping_line = join( "\t", $library, $sample_id, $flowcell_id, abs_path( $output_dir ), ( $paired_end ? "PE" : "SE" ));
-    $mapping_fh->print(  "$mapping_line\n" ) unless( $mapping_line eq $prev_mapping_line );
-    $prev_mapping_line = $mapping_line;
 }
-$mapping_fh->close;
 $sheet_fh->close;
-warn "STATUS: Parsed " . scalar( @rg_lines ) . " \@RG lines from BAM and wrote them into $output_dir/SampleSheet.csv and $output_dir/sample_mapping.txt\n";
+warn "STATUS: Parsed " . scalar( @rg_lines ) . " \@RG lines from BAM and wrote them into $output_dir/SampleSheet.csv\n";
 
 # Unless FASTQs already exist, use Picard to revert BQ scores, and create FASTQs; then zip em up
 unless( $skip_picard ) {
@@ -130,19 +124,29 @@ unless( $skip_picard ) {
     print `gzip $output_dir/*.fastq`;
 }
 
-# Make sure each FASTQ follows the Illumina/Casava naming scheme
+# Make sure FASTQs follow the Illumina/Casava naming scheme, and move them into per-RG subfolders
 # <SAMPLE NAME>_<BARCODE SEQUENCE>_L<LANE NUMBER (0-padded to 3 digits)>_R<READ NUMBER (either 1 or 2)>_<SET NUMBER (0-padded to 3 digits)>.fastq.gz
-foreach my $fq_name( keys %fq_info ){
-    my ( undef, $lane, $sample_id, undef, $index ) = split( ",", $fq_info{$fq_name} );
+my $rg_idx = 0;
+# Create a sample-fastq mapping file, in the format that the MSK BIC pipeline expects
+my $mapping_fh = IO::File->new( "$output_dir/sample_mapping.txt", ">" );
+foreach my $fq_name( keys %fq_info ) {
+    $rg_idx++;
+    mkdir "$output_dir/rg$rg_idx" unless( -d "$output_dir/rg$rg_idx" );
+    # $flowcell_id,$lane,$sample_id,,$index,$description,,,,,$platform,$library
+    my ( $lane, $sample_id, $index, $library ) = (split( ",", $fq_info{$fq_name} ))[1,2,4,11];
     my $padded_lane_id = sprintf( "L%03d", ( $lane ? $lane : "0" ));
-    my @fqs_to_rename = glob( "$output_dir/$fq_name*.fastq.gz $output_dir/$sample_id*$padded_lane_id*.fastq.gz" );
-    my $new_name = "$output_dir/$sample_id" . ( $index ? "_$index" : "" ) . "_$padded_lane_id";
+    my @fqs_to_rename = glob( "$output_dir/$fq_name*.fastq.gz $output_dir/rg*/$fq_name*.fastq.gz $output_dir/$sample_id*$padded_lane_id*.fastq.gz $output_dir/rg*/$sample_id*$padded_lane_id*.fastq.gz" );
+    my $new_name = "$output_dir/rg$rg_idx/$sample_id" . ( $index ? "_$index" : "" ) . "_$padded_lane_id";
     foreach my $fq_to_rename ( @fqs_to_rename ) {
         print `mv $fq_to_rename $new_name\_R1_001.fastq.gz` if( $fq_to_rename =~ m/_1.fastq.gz$/ or $fq_to_rename =~ m/_R1_001.fastq.gz$/ );
         print `mv $fq_to_rename $new_name\_R2_001.fastq.gz` if( $fq_to_rename =~ m/_2.fastq.gz$/ or $fq_to_rename =~ m/_R2_001.fastq.gz$/ );
     }
+    my $mapping_line = join( "\t", $library, $sample_id, $fq_name, abs_path( "$output_dir/rg$rg_idx" ), ( $paired_end ? "PE" : "SE" ));
+    $mapping_fh->print(  "$mapping_line\n" );
 }
+$mapping_fh->close;
 warn "STATUS: Renamed FASTQs to Illumina/Casava naming scheme\n" if( keys %fq_info );
+warn "STATUS: Generated FASTQs for " . $rg_idx . " readgroups and made a sample-fastq mapping file at $output_dir/sample_mapping.txt\n";
 
 __DATA__
 
@@ -165,7 +169,7 @@ __DATA__
 
 =head1 DESCRIPTION
 
-This script parses the readgroup info (lines starting with @RG) in a given BAM file, to generate a SampleSheet.csv and a sample_mapping.txt, formats familiar to IGO/BIC at MSKCC. Then Picard RevertSam followed by SamToFastq, is used to generate safely sanitized FASTQ files per read-group. Note that the script will fail if over 1% of reads had oddities that needed to be sanitized. The resulting FASTQs are renamed to follow the Illumina/Casava naming scheme.
+This script parses the readgroup info (lines starting with @RG) in a given BAM file, to generate a SampleSheet.csv and a sample_mapping.txt, formats familiar to the CMO at MSKCC. Then Picard RevertSam followed by SamToFastq, is used to generate safely sanitized FASTQ files per read-group. Note that the script will fail if over 1% of reads had oddities that needed to be sanitized. The resulting FASTQs are renamed to follow the Illumina/Casava naming scheme.
 
 =head2 Relevant links:
 
