@@ -14,7 +14,8 @@ use JSON::Parse qw( parse_json_safe ); # Helps us parse JSON files
 use Cwd qw( abs_path ); # Somewhat safe way to convert a relative path to an absolute path
 
 # Use the CMO JSON to pull paths to tools and data we'll need
-my $cmo_cfg_json = `cat /opt/common/CentOS_6-dev/cmo/cmo_resources.json`;
+my $cmo_cfg_json_file = ( $ENV{CMO_RESOURCE_CONFIG} ? $ENV{CMO_RESOURCE_CONFIG} : "/opt/common/CentOS_6-dev/cmo/cmo_resources.json" );
+my $cmo_cfg_json = `cat $cmo_cfg_json_file`;
 my $cmo_cfg = parse_json_safe( $cmo_cfg_json );
 my $java_bin = $cmo_cfg->{programs}->{java}->{default};
 my $samtools_bin = $cmo_cfg->{programs}->{samtools}->{default};
