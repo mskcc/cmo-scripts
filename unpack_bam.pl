@@ -67,8 +67,8 @@ foreach my $rg_line ( @rg_lines ) {
 
     # Parse out the easy things first
     my %rg = map{split( /:/, $_, 2 )} split( /\t/, $rg_line );
-    my ( $platform, $library, $insert_size, $date, $center, $description ) = map{$rg{$_} ? $rg{$_} : ""} qw( PL LB PI DT CN DS );
-    $sample_id = $rg{SM} unless( $sample_id );
+    my ( $sample_id_from_bam, $platform, $library, $insert_size, $date, $center, $description ) = map{$rg{$_} ? $rg{$_} : ""} qw( SM PL LB PI DT CN DS );
+    $sample_id = $sample_id_from_bam unless( $sample_id );
 
     # Do some cleanup and standardization of terms used
     $platform = lc( $platform );
@@ -106,9 +106,9 @@ foreach my $rg_line ( @rg_lines ) {
     }
 
     # Figure out what Picard would name this FASTQ, and retain structured info for renaming later
-    my $fq_name = $flowcell_id . ( $lane ? ".$lane" : "" ) . ( $index ? "-$index" : "" );
-    $flowcell_id = uc( $flowcell_id ); # There's at least 1 instance where this was lowercase
-    $fq_info{$fq_name} = "$flowcell_id,$lane,$sample_id,,$index,$description,,,,,$platform,$library,$insert_size,$date,$center";
+    my $fq_name = $flowcell_id . ( $lane ? ".$lane" : "" );
+    $flowcell_id = uc( $flowcell_id ); # Saw at least 1 instance where this was lowercase
+    $fq_info{$fq_name} = "$flowcell_id,$lane,$sample_id,$sample_id_from_bam,$index,$description,,,,,$platform,$library,$insert_size,$date,$center";
 
     # Write all this info into the SampleSheet
     $sheet_fh->print( $fq_info{$fq_name} . "\n" );
@@ -133,16 +133,17 @@ my $mapping_fh = IO::File->new( "$output_dir/sample_mapping.txt", ">" );
 foreach my $fq_name( keys %fq_info ) {
     $rg_idx++;
     mkdir "$output_dir/rg$rg_idx" unless( -d "$output_dir/rg$rg_idx" );
-    # $flowcell_id,$lane,$sample_id,,$index,$description,,,,,$platform,$library
-    my ( $lane, $sample_id, $index, $library ) = (split( ",", $fq_info{$fq_name} ))[1,2,4,11];
+    my ( $lane, $sample_id, $sample_id_from_bam, $index, $library ) = (split( ",", $fq_info{$fq_name} ))[1,2,3,4,11];
     my $padded_lane_id = sprintf( "L%03d", ( $lane ? $lane : "0" ));
-    my @fqs_to_rename = glob( "$output_dir/$fq_name*.fastq.gz $output_dir/rg*/$fq_name*.fastq.gz $output_dir/$sample_id*$padded_lane_id*.fastq.gz $output_dir/rg*/$sample_id*$padded_lane_id*.fastq.gz" );
-    my $new_name = "$output_dir/rg$rg_idx/$sample_id" . ( $index ? "_$index" : "" ) . "_$padded_lane_id";
+    my @fqs_to_rename = glob( "$output_dir/$fq_name*.fastq.gz $output_dir/rg$rg_idx/$fq_name*.fastq.gz $output_dir/$sample_id_from_bam*$padded_lane_id*.fastq.gz $output_dir/rg$rg_idx/$sample_id_from_bam*$padded_lane_id*.fastq.gz" );
+    my $new_name = "$output_dir/rg$rg_idx/$sample_id_from_bam" . ( $index ? "_$index" : "" ) . "_$padded_lane_id";
     foreach my $fq_to_rename ( @fqs_to_rename ) {
-        print `mv $fq_to_rename $new_name\_R1_001.fastq.gz` if( $fq_to_rename =~ m/_1.fastq.gz$/ or $fq_to_rename =~ m/_R1_001.fastq.gz$/ );
-        print `mv $fq_to_rename $new_name\_R2_001.fastq.gz` if( $fq_to_rename =~ m/_2.fastq.gz$/ or $fq_to_rename =~ m/_R2_001.fastq.gz$/ );
+        print `mv -f $fq_to_rename $new_name\_R1_001.fastq.gz` if(( $fq_to_rename =~ m/_1.fastq.gz$/ or $fq_to_rename =~ m/_R1_001.fastq.gz$/ ) and $fq_to_rename ne "$new_name\_R1_001.fastq.gz" );
+        print `mv -f $fq_to_rename $new_name\_R2_001.fastq.gz` if(( $fq_to_rename =~ m/_2.fastq.gz$/ or $fq_to_rename =~ m/_R2_001.fastq.gz$/ ) and $fq_to_rename ne "$new_name\_R2_001.fastq.gz" );
     }
-    my $mapping_line = join( "\t", $library, $sample_id, $fq_name, abs_path( "$output_dir/rg$rg_idx" ), ( $paired_end ? "PE" : "SE" ));
+    # ::TODO:: Stop hardcoding library name as "_1" after refactoring Roslin QC
+    #my $mapping_line = join( "\t", $library, $sample_id, $fq_name, abs_path( "$output_dir/rg$rg_idx" ), ( $paired_end ? "PE" : "SE" ));
+    my $mapping_line = join( "\t", "_1", $sample_id, $fq_name, abs_path( "$output_dir/rg$rg_idx" ), ( $paired_end ? "PE" : "SE" ));
     $mapping_fh->print(  "$mapping_line\n" );
 }
 $mapping_fh->close;
