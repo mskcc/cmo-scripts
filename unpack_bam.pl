@@ -139,6 +139,7 @@ unless( $skip_picard ) {
     print `$cmd`;
     print "RUNNING: gzip $output_dir/*.fastq\n";
     print `gzip $output_dir/*.fastq`;
+    print `rm $temp_filename`;
 }
 
 # Make sure FASTQs follow the Illumina/Casava naming scheme, and move them into per-RG subfolders
