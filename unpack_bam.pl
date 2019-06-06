@@ -8,7 +8,7 @@
 # modified on June 3, 2019
 # purpose: (1) Re-set default path of java, samtools, and picard's jar file; (2) Added input option of "picard-jar"
 # 
-# AUTHOR: Cyriac Kandoth (ckandoth@gmail.com); Zuojian Tang (zuojian.tang@gmail.com); Allan Bolipat (allan.bolipata@gmail.com)
+# AUTHOR: Cyriac Kandoth (ckandoth@gmail.com); Zuojian Tang (zuojian.tang@gmail.com); Allan Bolipata (allan.bolipata@gmail.com)
 
 use warnings; # Tells Perl to show warnings on anything that might not work as expected
 use strict; # Tells Perl to show errors if any of our code is ambiguous
