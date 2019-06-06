@@ -7,6 +7,8 @@
 # purpose: (1) Extract flowcell/lane information from first read ID of the @RG using @RG's ID; (2) Picard uses PU as fastq files's name if PU does not following the standard format. We need to consider this situation.
 # modified on June 3, 2019
 # purpose: (1) Re-set default path of java, samtools, and picard's jar file; (2) Added input option of "picard-jar"
+# modified on June 6, 2019
+# purpose: (1) Added option to set temp directory; (2) Changed pipe and /dev/stdout /dev/stdin logic in picard step
 # 
 # AUTHOR: Cyriac Kandoth (ckandoth@gmail.com); Zuojian Tang (zuojian.tang@gmail.com); Allan Bolipata (allan.bolipata@gmail.com)
 
@@ -26,7 +28,7 @@ my $samtools_bin = "samtools";
 my $picard_jar = "/opt/common/CentOS_6-dev/picard/v2.13/picard.jar";
 
 # Default temp directory for compatibility with old usage
-my $tmp_dir = "/scratch"
+my $tmp_dir = "/scratch";
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
@@ -183,6 +185,7 @@ __DATA__
  --input-bam      Path to the BAM file to unpack
  --output-dir     Path to output directory where FASTQs and readgroup info files will be stored
  --sample-id      Sample ID for the BAM. Any sample ID in the readgroup data is ignored
+ --tmp-dir        Path for temp directory used by picard; defaults to "/scratch"
  --picard-jar     Path to the Picard Jar file
  --help           Print a brief help message and quit
  --man            Print the detailed manual
