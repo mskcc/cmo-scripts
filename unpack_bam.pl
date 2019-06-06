@@ -7,8 +7,10 @@
 # purpose: (1) Extract flowcell/lane information from first read ID of the @RG using @RG's ID; (2) Picard uses PU as fastq files's name if PU does not following the standard format. We need to consider this situation.
 # modified on June 3, 2019
 # purpose: (1) Re-set default path of java, samtools, and picard's jar file; (2) Added input option of "picard-jar"
+# modified on June 6, 2019
+# purpose: (1) Added option to set temp directory; (2) Changed pipe and /dev/stdout /dev/stdin logic in picard step
 # 
-# AUTHOR: Cyriac Kandoth (ckandoth@gmail.com); Zuojian Tang (zuojian.tang@gmail.com)
+# AUTHOR: Cyriac Kandoth (ckandoth@gmail.com); Zuojian Tang (zuojian.tang@gmail.com); Allan Bolipata (allan.bolipata@gmail.com)
 
 use warnings; # Tells Perl to show warnings on anything that might not work as expected
 use strict; # Tells Perl to show errors if any of our code is ambiguous
@@ -17,11 +19,16 @@ use Getopt::Long qw( GetOptions ); # Helps parse user provided arguments
 use Pod::Usage qw( pod2usage ); # Helps us generate nicely formatted help/man content
 use JSON::Parse qw( parse_json_safe ); # Helps us parse JSON files
 use Cwd qw( abs_path ); # Somewhat safe way to convert a relative path to an absolute path
+use Cwd qw( getcwd ); # Need working directory
+use File::Basename; # Needed to create somewhat unique pathnames
 
 # Use the CMO JSON to pull paths to tools and data we'll need
 my $java_bin = "java";
 my $samtools_bin = "samtools";
 my $picard_jar = "/opt/common/CentOS_6-dev/picard/v2.13/picard.jar";
+
+# Default temp directory for compatibility with old usage
+my $tmp_dir = "/scratch";
 
 # Check for missing or crappy arguments
 unless( @ARGV and $ARGV[0]=~m/^-/ ) {
@@ -37,6 +44,7 @@ GetOptions(
     'input-bam=s' => \$bam_file,
     'output-dir=s' => \$output_dir,
     'sample-id=s' => \$sample_id,
+    'tmp-dir=s' => \$tmp_dir,
     'picard-jar=s' => \$picard_jar
 ) or pod2usage( -verbose => 1, -input => \*DATA, -exitval => 2 );
 pod2usage( -verbose => 1, -input => \*DATA, -exitval => 0 ) if( $help );
@@ -127,11 +135,13 @@ warn "STATUS: Parsed " . scalar( @rg_lines ) . " \@RG lines from BAM and wrote t
 
 # Unless FASTQs already exist, use Picard to revert BQ scores, and create FASTQs; then zip em up
 unless( $skip_picard ) {
-    my $cmd = "$java_bin -Xmx6g -jar $picard_jar RevertSam TMP_DIR=/scratch INPUT=$bam_file OUTPUT=/dev/stdout SANITIZE=true COMPRESSION_LEVEL=0 VALIDATION_STRINGENCY=SILENT | java -Xmx6g -jar $picard_jar SamToFastq TMP_DIR=/scratch INPUT=/dev/stdin OUTPUT_PER_RG=true RG_TAG=$rg_tag OUTPUT_DIR=$output_dir VALIDATION_STRINGENCY=SILENT";
+    my $temp_filename = $output_dir."/".basename($bam_file).".temp_file";
+    my $cmd = "$java_bin -Xmx6g -jar $picard_jar RevertSam TMP_DIR=$tmp_dir INPUT=$bam_file OUTPUT=$temp_filename SANITIZE=true COMPRESSION_LEVEL=0 VALIDATION_STRINGENCY=SILENT; java -Xmx6g -jar $picard_jar SamToFastq TMP_DIR=$tmp_dir INPUT=$temp_filename OUTPUT_PER_RG=true RG_TAG=$rg_tag OUTPUT_DIR=$output_dir VALIDATION_STRINGENCY=SILENT";
     print "RUNNING: $cmd\n";
     print `$cmd`;
     print "RUNNING: gzip $output_dir/*.fastq\n";
     print `gzip $output_dir/*.fastq`;
+    print `rm $temp_filename`;
 }
 
 # Make sure FASTQs follow the Illumina/Casava naming scheme, and move them into per-RG subfolders
@@ -175,6 +185,7 @@ __DATA__
  --input-bam      Path to the BAM file to unpack
  --output-dir     Path to output directory where FASTQs and readgroup info files will be stored
  --sample-id      Sample ID for the BAM. Any sample ID in the readgroup data is ignored
+ --tmp-dir        Path for temp directory used by picard; defaults to "/scratch"
  --picard-jar     Path to the Picard Jar file
  --help           Print a brief help message and quit
  --man            Print the detailed manual
