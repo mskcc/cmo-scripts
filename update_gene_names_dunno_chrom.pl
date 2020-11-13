@@ -66,10 +66,10 @@ $annotFh->close;
 
 print scalar( keys %defCnt ), " gene names needed converting to HUGO\n";
 print scalar( keys %undefCnt ), " gene names could not be resolved\n";
-print "Unresolved names with more than two variants:\n";
+print "Unresolved names and #occurrences:\n";
 foreach my $key ( sort {$undefCnt{$b} <=> $undefCnt{$a}} ( keys %undefCnt ))
 {
-  if( $undefCnt{ $key } > 2) { print $undefCnt{ $key }, "\t$key\n"  };
+  if( $undefCnt{ $key }) { print $undefCnt{ $key }, "\t$key\n"  };
 }
 
 sub getHugoSymbol

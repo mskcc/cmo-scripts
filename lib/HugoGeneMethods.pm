@@ -5,12 +5,13 @@ use warnings;
 use Carp;
 use LWP::Simple qw( get );
 use IO::File;
-
-use lib "/ifs/res/pwg/scripts/lib";
 use HugoGene;
 
-my $HugoLocal = "/ifs/res/pwg/scripts/lib/hugo_data.tsv";
-my $HugoRemote = "http://www.genenames.org/cgi-bin/download?title=HGNC+output+data&hgnc_dbtag=on&col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=gd_status&col=gd_locus_type&col=gd_prev_sym&col=gd_prev_name&col=gd_aliases&col=gd_name_aliases&col=gd_pub_chrom_map&col=gd_date2app_or_res&col=gd_date_mod&col=gd_date_sym_change&col=gd_date_name_change&col=gd_pub_acc_ids&col=gd_enz_ids&col=gd_pub_eg_id&col=gd_mgd_id&col=gd_other_ids&col=gd_other_ids_list&col=gd_pubmed_ids&col=gd_pub_refseq_ids&col=gd_record_type&col=gd_primary_ids&col=gd_secondary_ids&col=gd_vega_ids&col=gd_lsdb_links&col=md_gdb_id&col=md_eg_id&col=md_mim_id&col=md_refseq_id&col=md_prot_id&col=md_ensembl_id&col=md_ucsc_id&status=Approved&status=Entry+Withdrawn&status_opt=2&level=pri_sec&=on&where=&order_by=gd_app_sym_sort&limit=&format=text&submit=submit&.cgifields=&.cgifields=level&.cgifields=chr&.cgifields=status&.cgifields=hgnc_dbtag";
+use File::Basename 'dirname';
+use Cwd 'abs_path';
+my $lib_dir = dirname( abs_path( __FILE__ ));
+my $HugoLocal = $lib_dir . "/hugo_data.tsv";
+my $HugoRemote = "https://www.genenames.org/cgi-bin/download?title=HGNC+output+data&hgnc_dbtag=on&col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=gd_status&col=gd_locus_type&col=gd_prev_sym&col=gd_prev_name&col=gd_aliases&col=gd_name_aliases&col=gd_pub_chrom_map&col=gd_date2app_or_res&col=gd_date_mod&col=gd_date_sym_change&col=gd_date_name_change&col=gd_pub_acc_ids&col=gd_enz_ids&col=gd_pub_eg_id&col=gd_mgd_id&col=gd_other_ids&col=gd_other_ids_list&col=gd_pubmed_ids&col=gd_pub_refseq_ids&col=gd_record_type&col=gd_primary_ids&col=gd_secondary_ids&col=gd_vega_ids&col=gd_lsdb_links&col=md_gdb_id&col=md_eg_id&col=md_mim_id&col=md_refseq_id&col=md_prot_id&col=md_ensembl_id&col=md_ucsc_id&status=Approved&status=Entry+Withdrawn&status_opt=2&level=pri_sec&=on&where=&order_by=gd_app_sym_sort&limit=&format=text&submit=submit&.cgifields=&.cgifields=level&.cgifields=chr&.cgifields=status&.cgifields=hgnc_dbtag";
 
 # 0. HGNC ID
 # 1. Approved Symbol
@@ -74,7 +75,7 @@ sub makeHugoGeneObjects {
     my $hugoPage = loadHugoPage();
 
     foreach my $line (split /\n/, $hugoPage) {
-        if ( $line =~ /withdrawn/i || $line =~ /HGNC ID\s+Approved\s+Symbol\s+/ ) {  next; }
+        if ( $line =~ /withdrawn/i || $line =~ /HGNC ID\s+Approved\s+Symbol\s+/i ) {  next; }
         my @entries = split /\t/, $line;
 
         my $hugo = $entries[1];

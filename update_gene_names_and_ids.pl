@@ -109,10 +109,10 @@ $mafFh->close;
 print "\n";
 print $defCnt, " gene names needed converting to HUGO\n";
 print scalar( keys %ambigCnt ), " gene names could not be resolved\n";
-print "Unresolved names with more than two variants in the MAF:\n";
+print "Unresolved names and #occurrences:\n";
 foreach my $key ( sort {$ambigCnt{$b} <=> $ambigCnt{$a}} ( keys %ambigCnt ))
 {
-  print $ambigCnt{ $key }, "\tChr$key\n" if( $ambigCnt{ $key } > 2 );
+  print $ambigCnt{ $key }, "\tChr$key\n" if( $ambigCnt{ $key });
 }
 
 sub getHugoSymbol
